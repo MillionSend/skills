@@ -1,19 +1,32 @@
 ---
 name: millionsend-webhooks
-description: Subscribe to and verify MillionSend webhook events (email.sent, delivered, bounced, complained, opened, clicked, delivery_delayed). Use when building a webhook receiver for a MillionSend instance, verifying Standard Webhooks signatures (webhook-signature v1 HMAC), or debugging failed deliveries and retries.
+description: Subscribe to and verify MillionSend webhook events (email.sent, delivered, bounced, complained, opened, clicked, delivery_delayed) — /webhooks CRUD via the REST API or the dashboard, Standard Webhooks signature verification (webhook-signature v1 HMAC), retries, and the receiver checklist. Use when creating webhook endpoints, building a webhook receiver for a MillionSend instance, or debugging failed deliveries.
 ---
 
 # MillionSend webhooks
 
-MillionSend signs webhooks with the **Standard Webhooks** spec — the same scheme Resend/Svix use, so `standardwebhooks` and `svix` verification libraries work unchanged.
+MillionSend signs webhooks with the **Standard Webhooks** spec — the same scheme behind Resend/Svix webhooks, so `standardwebhooks` and `svix` verification libraries work unchanged.
 
-## Subscribe
+## Subscribe — POST /webhooks (or the dashboard)
 
-Webhook endpoints are managed in the **dashboard** (Webhooks page), not via the REST API: add the endpoint URL, pick the events (or all), and copy the endpoint's signing secret (`whsec_...`). Event types:
+```sh
+curl -X POST "$MILLIONSEND_BASE_URL/webhooks" \
+  -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "https://example.com/webhooks/millionsend",
+    "events": ["email.bounced", "email.complained"]
+  }'
+# → { "object": "webhook", "id": "<uuid>", "signing_secret": "whsec_..." }
+```
 
-`email.sent` · `email.delivered` · `email.delivery_delayed` · `email.bounced` · `email.complained` · `email.opened` · `email.clicked`
+- `endpoint` must be **https** (a signed customer-event payload must not travel plaintext).
+- `events` — at least one of the 7 types actually emitted: `email.sent` · `email.delivered` · `email.delivery_delayed` · `email.bounced` · `email.complained` · `email.opened` · `email.clicked`. Any other name (e.g. Resend's `contact.created`) is a loud 422, not a subscription that never fires.
+- `signing_secret` is returned on **create and get only**, never in list rows.
 
-Opens/clicks and bounce/complaint events require the SES event pipeline to be configured on the instance (`SES_CONFIGURATION_SET` + SNS/SQS — see the millionsend-self-host skill).
+Other routes (full_access key required): `GET /webhooks` (keyset list; a row's `events: null` means "all events" — dashboard-created endpoints can be wired that way) · `GET /webhooks/{id}` (includes `signing_secret`) · `PATCH /webhooks/{id}` (any of `endpoint`, `events`, `status`: `enabled` | `disabled`) · `DELETE /webhooks/{id}` → `{ ..., "deleted": true }`. The dashboard's Webhooks page manages the same endpoints.
+
+Opens/clicks and bounce/complaint events require the SES event pipeline on the instance (`SES_CONFIGURATION_SET` + SNS/SQS — see the millionsend-self-host skill); cloud has it wired already.
 
 ## Delivery format
 
@@ -22,6 +35,8 @@ Each delivery is an HTTP POST with a JSON body and three headers:
 - `webhook-id` — unique message id (`msg_<uuid>`); stable across retries of the same event → use it for dedupe.
 - `webhook-timestamp` — unix **seconds**.
 - `webhook-signature` — `v1,<base64 HMAC-SHA256>`; may contain several space-separated `v1,...` candidates (accept if any matches).
+
+(The header names are the Standard Webhooks defaults, **not** `svix-*` — code that reads `svix-signature` by name must switch; the svix/standardwebhooks libraries handle both.)
 
 Payload (mirrors Resend's webhook event shape):
 

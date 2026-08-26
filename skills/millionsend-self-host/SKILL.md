@@ -51,11 +51,11 @@ Manual equivalent: SNS standard topic (same region as SES) → its ARN in `SNS_T
 
 ## Domain verification (DNS)
 
-Done from the dashboard after boot: Domains → add domain → it shows the DKIM CNAME records (SES-managed DKIM, or bring your own key — BYODKIM) to create at the DNS provider. Sending from a domain is refused until it shows **verified**.
+From the dashboard after boot (Domains → add domain → it shows the DKIM CNAME records to create at the DNS provider), or via the REST API (`POST /domains` → records → `POST /domains/{id}/verify` — see the millionsend-domains skill). Sending from a domain is refused until it shows **verified**.
 
 ## SMTP relay
 
-For software that only speaks SMTP. Host: the Docker host; port `2587` (`SMTP_PORT` to change); username `millionsend` (fixed); password: an `ms_` API key from the dashboard. Plaintext by default — STARTTLS is offered (and required before AUTH) only when `SMTP_TLS_CERT_PATH`/`SMTP_TLS_KEY_PATH` point at a PEM keypair, so otherwise keep the port off the public internet. Same accept pipeline as `POST /emails`. The service is in the compose files; remove it if unused.
+For software that only speaks SMTP. Host: the Docker host; port `2587` (`SMTP_PORT` to change); username `millionsend` (fixed); password: an `ms_` API key from the dashboard. STARTTLS is offered (and required before AUTH) when `SMTP_TLS_CERT_PATH`/`SMTP_TLS_KEY_PATH` point at a PEM keypair; **without one the relay refuses to start** unless `SMTP_ALLOW_INSECURE_AUTH=true` is set explicitly — do that only on a trusted private network with `SMTP_BIND_ADDRESS=127.0.0.1`, never on a public bind (AUTH would send the API key in plaintext). Same accept pipeline as `POST /emails`. The service is in the compose files; remove it if unused.
 
 ## Operations gotchas
 
@@ -63,4 +63,5 @@ For software that only speaks SMTP. Host: the Docker host; port `2587` (`SMTP_PO
 - **Run exactly one worker container** — the SES rate limiter is in-memory, so N replicas send at N× the configured rate. Scale vertically. To split processes across containers set `PROCESS` to `api` | `worker` | `web` (default `all`).
 - Send rate and email retention are dashboard settings (Settings → Instance; defaults 14/s and 30 days). `SES_MAX_SEND_RATE` / `EMAIL_RETENTION_DAYS` env vars still work as boot overrides.
 - Ports are tunable: `WEB_PORT` (dashboard), `PORT` (API), `SMTP_PORT` (relay). If the dashboard moves, update `APP_BASE_URL` to match.
+- Password recovery ("forgot password") only appears when `AUTH_EMAIL_FROM` is set — a sender like `Acme <auth@acme.dev>` whose domain is a verified SES identity of the instance. Leave it unset to hide recovery entirely.
 - Full reference: `SELF_HOSTING.md` in github.com/MillionSend/millionsend.
