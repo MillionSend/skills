@@ -1,6 +1,6 @@
 ---
 name: millionsend-contacts
-description: Manage contacts, typed contact properties, segments, and topics on MillionSend (Resend-compatible email API). Use when creating, listing, updating, or deleting contacts, defining custom property keys, handling unsubscribes, building segments (saved filters or manual lists), managing segment membership, or managing topic subscriptions via the MillionSend REST API or SDKs.
+description: Manage contacts, typed contact properties, segments, topics, and the suppression list on MillionSend (Resend-compatible email API). Use when creating, listing, updating, or deleting contacts, bulk-loading contacts via POST /contacts/batch (skip/upsert), defining custom property keys, handling unsubscribes, building segments (saved filters or manual lists), managing segment membership, managing topic subscriptions, or adding/removing suppressed addresses via the MillionSend REST API or SDKs.
 ---
 
 # MillionSend contacts, properties, segments, and topics
@@ -37,9 +37,29 @@ Read/update/delete — the `{id}` path segment accepts **either the contact UUID
 - `DELETE /contacts/{id}` → `{ "object": "contact", "contact": "<uuid>", "deleted": true }`.
 - `GET /contacts?limit=&after=|before=` — keyset pagination: `limit` 1–100 (default 20), cursors are item ids, `after`/`before` mutually exclusive; response `{ object: "list", data: [...], has_more }`.
 
-Unsubscribe semantics: `"unsubscribed": true` records the timestamp and excludes the contact from **all broadcasts** (transactional `POST /emails` sends are unaffected). Separate from this, hard bounces and complaints land on the team suppression list, which blocks both broadcasts and transactional sends. Broadcast emails carry RFC 8058 one-click unsubscribe links/headers automatically; recipients who click get `unsubscribed: true` set for them.
+Unsubscribe semantics: `"unsubscribed": true` records the timestamp and excludes the contact from **all broadcasts** (transactional `POST /emails` sends are unaffected). Separate from this, hard bounces and complaints land on the team suppression list (below), which blocks both broadcasts and transactional sends. Broadcast emails carry RFC 8058 one-click unsubscribe links/headers automatically; recipients who click get `unsubscribed: true` set for them **and** a retained suppression entry with origin `unsubscribe` — only an explicit `PATCH /contacts/{id}` with `"unsubscribed": false` clears it (re-creating or batch-importing the address never does).
 
-CSV import exists in the dashboard (Contacts page) — there is no import API endpoint; for bulk API loading, loop `POST /contacts`.
+### Bulk create — POST /contacts/batch
+
+A MillionSend extension (Resend imports contacts only via CSV): a JSON **array** of 1–1000 `POST /contacts` bodies, written in one transaction. The dashboard's CSV import is the other bulk path.
+
+```sh
+curl -X POST "$MILLIONSEND_BASE_URL/contacts/batch?on_conflict=upsert" \
+  -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "x-batch-validation: permissive" \
+  -d '[
+    { "email": "ana@example.com", "first_name": "Ana", "properties": { "plan": "pro" } },
+    { "email": "bob@example.com", "segments": [{ "id": "<segment-uuid>" }] }
+  ]'
+# → { "data": [{ "object": "contact", "index": 0, "id": "<uuid>", "status": "updated" }, { "object": "contact", "index": 1, "id": "<uuid>", "status": "created" }],
+#     "counts": { "created": 1, "updated": 1, "skipped": 0, "failed": 0 } }
+```
+
+- `on_conflict` (query, default `error`) — what to do with an email that already belongs to a contact, and with an email repeated inside the batch: `error` → the item fails (409 `Contact already exists` / 422 `Duplicate email in batch`); `skip` → existing contact (or first occurrence) untouched, reported as `status: "skipped"` with its id; `upsert` → merge: `first_name`/`last_name` only when provided, `properties` merged key by key, `segments` added, `topics` upserted; repeats collapse into one write (later scalars win, associations union).
+- **Never re-subscribes**: `unsubscribed: true` opts out; `unsubscribed: false` on an already-unsubscribed contact is ignored. Suppressions are never touched. Use `PATCH /contacts/{id}` to re-subscribe deliberately.
+- `x-batch-validation` (header, default `strict`) — strict: the first failing item (by index) fails the whole batch with its own status and a `contacts.<index>: <message>` prefix, nothing written. `permissive`: valid subset written, failures listed as `errors: [{ index, message }]`.
+- Response: `data` in request order, one entry per successful item; `counts` sum to the request length; `errors` only in permissive mode. Unknown segment/topic id → 404 `not_found`; 0 or >1000 items, unknown `on_conflict`/header value → 422.
 
 ## Contact properties — typed keys at /contact-properties
 
@@ -106,6 +126,31 @@ curl -X PATCH "$MILLIONSEND_BASE_URL/contacts/ana@example.com/topics" \
   -d '[{ "id": "<topic-uuid>", "subscription": "opt_out" }]'
 ```
 
+## Suppressions — /suppressions
+
+The team's do-not-send list. Entries block both broadcasts and transactional sends (`POST /emails` strips suppressed recipients; all-`to`-suppressed → 422 `All recipients are suppressed`). Each entry: `{ id, email, origin, source_id, created_at }` — `origin` is `bounce` | `complaint` | `manual` | `unsubscribe` (the last is a MillionSend superset value: retained one-click opt-outs), `source_id` the email id whose bounce/complaint created it (else null). Same wire as Resend's `suppressions` surface, so the `resend` SDK's `suppressions.add/get/list/remove` and `suppressions.batch.add/remove` work as-is.
+
+```sh
+# block one address (origin manual). Idempotent: already suppressed for any origin → same row, its existing id returned
+curl -X POST "$MILLIONSEND_BASE_URL/suppressions" \
+  -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "bounced@example.com" }'
+# → { "object": "suppression", "id": "<uuid>" }
+
+# bulk (up to 1000 per call; Resend caps at 100) — e.g. carrying a bounce list over from another provider
+curl -X POST "$MILLIONSEND_BASE_URL/suppressions/batch/add" \
+  -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "emails": ["a@example.com", "b@example.com"] }'
+# → { "data": [{ "object": "suppression", "id": "..." }, ...] } — one per distinct address, input order
+```
+
+- `GET /suppressions?limit=&after=|before=&origin=bounce` — keyset list; unknown `origin` → 422.
+- `GET /suppressions/{id}` / `DELETE /suppressions/{id}` — `{id}` is the suppression UUID **or the email address**; 404 `not_found` otherwise. Delete → `{ "object": "suppression", "id": ..., "deleted": true }` and the address can receive mail again (it is re-suppressed automatically on the next bounce/complaint).
+- `POST /suppressions/batch/remove` — body `{ "emails": [...] }` **or** `{ "ids": [...] }` (exactly one, 1–1000); returns only the rows actually removed.
+- Addresses erased under GDPR/LGPD keep blocking sends but are hidden from the list and from lookups by email; they are reachable by id only (email reads `"[erased]"`), and re-adding the address returns that id without restoring it.
+
 ## SDK equivalents
 
-Node: `ms.contacts.create({...})`, `ms.contacts.list({ segmentId? })`, `ms.contacts.get({ id | email })`, `ms.contacts.update(...)`, `ms.contacts.remove(...)`, `ms.contacts.segments.add/remove(...)`, plus `ms.segments.*` and `ms.topics.*` — same shapes as the REST bodies. Python: `millionsend.Contacts.create({...})`, `millionsend.Contacts.get(email="...")`, `millionsend.Segments.*`, `millionsend.Topics.*`. Contact-properties has no SDK surface yet — use REST. Errors follow `{ statusCode, name, message }` with names like `validation_error`, `not_found`, `conflict`, `restricted_api_key`.
+Node: `ms.contacts.create({...})`, `ms.contacts.list({ segmentId? })`, `ms.contacts.get({ id | email })`, `ms.contacts.update(...)`, `ms.contacts.remove(...)`, `ms.contacts.segments.add/remove(...)`, plus `ms.segments.*` and `ms.topics.*` — same shapes as the REST bodies. Python: `millionsend.Contacts.create({...})`, `millionsend.Contacts.get(email="...")`, `millionsend.Segments.*`, `millionsend.Topics.*`. Contact-properties and `POST /contacts/batch` have no SDK surface yet — use REST; suppressions are reachable through the official `resend` SDK pointed at MillionSend (`resend.suppressions.*`). Errors follow `{ statusCode, name, message }` with names like `validation_error`, `not_found`, `conflict`, `restricted_api_key`.

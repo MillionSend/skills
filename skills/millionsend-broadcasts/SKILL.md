@@ -1,6 +1,6 @@
 ---
 name: millionsend-broadcasts
-description: Compose, schedule, send, and cancel marketing broadcasts on MillionSend (Resend-compatible email API). Use when sending campaigns to all contacts, a segment, or a topic, sending or scheduling on create, personalizing with merge fields like {{{FIRST_NAME|there}}}, setting preview (preheader) text, or wiring unsubscribe links.
+description: Compose, schedule, send, and cancel marketing broadcasts on MillionSend (Resend-compatible email API), and manage reusable templates via /templates. Use when sending campaigns to all contacts, a segment, or a topic, sending or scheduling on create, personalizing with merge fields like {{{FIRST_NAME|there}}}, setting preview (preheader) text, wiring unsubscribe links, or creating/updating/duplicating templates (with aliases) through the API.
 ---
 
 # MillionSend broadcasts
@@ -69,6 +69,27 @@ Only drafts can be sent (400 `invalid_parameter` otherwise). Preconditions check
 
 Works only while status is scheduled (`queued` on the wire, before fan-out starts); after that, 400 `invalid_parameter` "Only scheduled broadcasts can be canceled".
 
+## Templates — /templates
+
+Reusable content (`subject`, `html`, optional `text`) for broadcasts. The dashboard composer's template picker **copies** a template's content into a broadcast as a starting snapshot — no link back, later template edits change nothing. Wire-compatible with Resend's `templates` surface (the `resend` SDK's `templates.create/get/list/update/publish/duplicate/remove` work as-is), with these deltas:
+
+- **No draft/publish cycle, no versions**: every save is live. `status` is always `published`, `published_at` = `created_at`, `current_version_id` = `id`, `has_unpublished_versions` = `false`; `POST /templates/{id}/publish` is an idempotent no-op (404 if unknown).
+- **Not supported yet — loud, not dropped**: `from`, `reply_to`, `variables` with a value → 422 `validation_error` "`<field>` is not supported on templates yet"; reads return `null`, `null`, `[]`. Merge fields (`{{{FIRST_NAME}}}`, `{{{plan}}}`) work without declaring variables.
+- **No send-by-template yet**: `POST /emails` and `POST /broadcasts` take no template reference — pass `html`/`text` (fetch them from `GET /templates/{id}` if needed).
+
+```sh
+curl -X POST "$MILLIONSEND_BASE_URL/templates" \
+  -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Welcome", "alias": "welcome-v1", "subject": "Hi {{{FIRST_NAME|there}}}", "html": "<p>Welcome aboard.</p>" }'
+# → { "object": "template", "id": "<uuid>" }
+```
+
+- `name` 1–200 chars (trimmed), `html` required (≤ 500k, stored as sent), `subject` ≤ 998, `text` ≤ 500k; `""` for `subject`/`text` clears it.
+- `alias` (optional): `^[A-Za-z0-9][A-Za-z0-9._-]*$`, ≤ 100 chars, case-sensitive, unique per team, must not look like a UUID (422). Taken → 409 with name `validation_error`, message `Template alias already exists`.
+- Every single-template route takes **id or alias**: `GET /templates/{id|alias}` (full body), `PATCH /templates/{id|alias}` (any of `name`, `alias` — `null` clears —, `subject`, `html`, `text`; empty body is a no-op), `DELETE /templates/{id|alias}` → `{ ..., "deleted": true }` (broadcasts keep their copied content), `POST /templates/{id|alias}/publish`, `POST /templates/{id|alias}/duplicate` → new id, named `<name> (copy)`, no alias.
+- `GET /templates?limit=&after=|before=` — keyset list of `{ id, name, alias, status, published_at, created_at, updated_at }`.
+
 ## SDK equivalents
 
-Node: `ms.broadcasts.create({...})` (incl. `previewText`, `send`, `scheduledAt`), `.update(id, {...})`, `.list()`, `.get(id)`, `.send(id, { scheduledAt })`, `.cancel(id)`, `.remove(id)`. Python: `millionsend.Broadcasts.create({...})`, `.send(id, {"scheduled_at": ...})`, etc. Same field names and error codes as REST.
+Node: `ms.broadcasts.create({...})` (incl. `previewText`, `send`, `scheduledAt`), `.update(id, {...})`, `.list()`, `.get(id)`, `.send(id, { scheduledAt })`, `.cancel(id)`, `.remove(id)`. Python: `millionsend.Broadcasts.create({...})`, `.send(id, {"scheduled_at": ...})`, etc. Same field names and error codes as REST. Templates: the official `resend` SDK's `templates.*` pointed at MillionSend (`resend.templates.create({...}).publish()` chains fine — publish is a no-op).
