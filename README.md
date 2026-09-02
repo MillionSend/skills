@@ -26,7 +26,7 @@ npx skills add MillionSend/skills --skill millionsend-send-email
 | [millionsend-domains](skills/millionsend-domains/SKILL.md) | `/domains` create → DNS records → verify, tracking toggles, plus `/api-keys` (permissions, domain-scoped keys) |
 | [millionsend-webhooks](skills/millionsend-webhooks/SKILL.md) | `/webhooks` CRUD, bring-your-own `whsec_` secret, Standard Webhooks signature verification (`webhook-*` and `svix-*` headers), retries, receiver checklist |
 | [millionsend-self-host](skills/millionsend-self-host/SKILL.md) | Stand up an instance: `npx @millionsend/setup`, Docker Compose, AWS SES/SNS/SQS events, DNS, SMTP relay |
-| [millionsend-migrate-from-resend](skills/millionsend-migrate-from-resend/SKILL.md) | Zero-code migration via `RESEND_BASE_URL`/`RESEND_API_URL`, SDK swap table for 9 languages, SMTP swap, the deliberate deltas |
+| [millionsend-migrate-from-resend](skills/millionsend-migrate-from-resend/SKILL.md) | `npx @millionsend/cli migrate --from resend` (read-only against Resend; plan / apply / status / rollback; re-run to sync), then zero-code cutover via `RESEND_BASE_URL`/`RESEND_API_URL`, SDK swap table for 9 languages, SMTP swap, the deliberate deltas |
 | [millionsend-mcp](skills/millionsend-mcp/SKILL.md) | Connect Claude Code / Claude Desktop / Cursor / VS Code to the built-in MCP server (`/mcp`, OAuth, team-scoped) and use its tools |
 
 ## License
