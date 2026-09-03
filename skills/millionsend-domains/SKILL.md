@@ -13,11 +13,11 @@ Everything a team needs before its first send: a verified sending domain and an 
 curl -X POST "$MILLIONSEND_BASE_URL/domains" \
   -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "name": "acme.dev", "region": "us-east-1", "custom_return_path": "send" }'
+  -d '{ "name": "acme.dev", "custom_return_path": "send" }'
 ```
 
 - `name` — **lowercase** registrable hostname (uppercase is a 422, not normalized: SES registers the identity exactly as typed). Already added → 409 with name `conflict`.
-- `region` — optional SES region; defaults to the instance's region.
+- `region` — optional. Each instance serves one SES region (MillionSend Cloud: `sa-east-1`) and uses it when the field is omitted; any other value is a 422 naming the served region. Don't copy a region from another provider.
 - `custom_return_path` — the MAIL FROM subdomain (Resend's name for it), default `"send"`.
 
 Response: the domain object (`id`, `name`, `status`, `region`, `open_tracking`, `click_tracking`, `tracking_subdomain`, `capabilities`) plus `records[]` — the DNS rows to create at the DNS provider, in the Resend SDK shape `{ record, name, type, ttl, status, value, priority? }`: DKIM CNAMEs, the MAIL FROM MX/TXT pair, and a recommended DMARC TXT row (a MillionSend superset — Resend doesn't include it).
