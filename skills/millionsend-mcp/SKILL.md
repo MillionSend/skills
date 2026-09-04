@@ -77,6 +77,8 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `send_email` | `emails:send` | Full `POST /emails` shape incl. `scheduled_at`, `topic_id`, `attachments`, `headers`. |
 | `create_contact` | `audience:write` | Inline `segments` and `topics` supported; 409 on duplicate email. |
 | `delete_contacts` | `audience:write` | Up to 1,000 contacts per call by `ids` or `emails`; an imported list can be undone in a few calls instead of thousands. |
+| `create_contact_preferences_link` | `audience:write` | The contact's hosted preference-center URL (no expiry; hand it only to the contact). |
+| `rotate_webhook_secret` | `webhooks:write` | **admin.** New `whsec_` secret; the previous one keeps signing for `overlap_hours` (default 24) so receivers switch without a gap. |
 | `create_contact_batch` | `audience:write` | Up to 1,000 contacts per call — use it for imports. `on_conflict: skip\|upsert`, `validation: permissive` writes the valid subset and lists failures in `errors`. |
 | `add_suppressions` / `remove_suppressions` / `delete_suppression` | `audience:write` | Batch block/unblock up to 1,000 addresses; `origin` on add keeps an import's reason (`unsubscribe` allowed). |
 | `update_contact` | `audience:write` | Name, `properties`, `unsubscribed`; omitted fields unchanged. |
