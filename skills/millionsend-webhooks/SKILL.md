@@ -1,6 +1,6 @@
 ---
 name: millionsend-webhooks
-description: Subscribe to and verify MillionSend webhook events (email.sent, delivered, bounced, complained, opened, clicked, delivery_delayed) — /webhooks CRUD via the REST API or the dashboard, bring-your-own whsec_ signing_secret, Standard Webhooks signature verification (webhook-signature v1 HMAC, also sent as svix-*), retries, and the receiver checklist. Use when creating webhook endpoints, migrating a Resend/Svix receiver, building a webhook receiver for a MillionSend instance, or debugging failed deliveries.
+description: Subscribe to and verify MillionSend webhook events (email.sent, delivered, bounced, complained, opened, clicked, delivery_delayed, plus team-level deliverability.* and quota.*) — /webhooks CRUD via the REST API or the dashboard, bring-your-own whsec_ signing_secret, Standard Webhooks signature verification (webhook-signature v1 HMAC, also sent as svix-*), retries, and the receiver checklist. Use when creating webhook endpoints, migrating a Resend/Svix receiver, building a webhook receiver for a MillionSend instance, or debugging failed deliveries.
 ---
 
 # MillionSend webhooks
@@ -21,7 +21,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/webhooks" \
 ```
 
 - `endpoint` must be **https** (a signed customer-event payload must not travel plaintext).
-- `events` — at least one of the 7 types actually emitted: `email.sent` · `email.delivered` · `email.delivery_delayed` · `email.bounced` · `email.complained` · `email.opened` · `email.clicked`. Any other name (e.g. Resend's `contact.created`) is a loud 422, not a subscription that never fires.
+- `events` — at least one of the types actually emitted: `email.sent` · `email.delivered` · `email.delivery_delayed` · `email.bounced` · `email.complained` · `email.opened` · `email.clicked`, plus the team-level `deliverability.warning` · `deliverability.paused` · `quota.warning` · `quota.reached` (no email in `data`; they describe the team's standing). Any other name (e.g. Resend's `contact.created`) is a loud 422, not a subscription that never fires.
 - `signing_secret` (optional on create) — bring your own: `whsec_` + standard base64 (padded, `+`/`/` alphabet) of 24–64 bytes, the format Resend/Svix issue, so a receiver that already verifies with that secret needs no redeploy. Omit it and one is generated. Anything else → 422 `validation_error` with message `signing_secret must be whsec_ followed by base64 of 24-64 bytes`.
 - `signing_secret` is returned on **create and get only**, never in list rows, and cannot be changed by `PATCH` — delete and re-create to rotate.
 

@@ -64,6 +64,7 @@ Only drafts can be sent (400 `invalid_parameter` otherwise). Preconditions check
 - The instance must have `APP_BASE_URL` set — unsubscribe links are built from it (422 otherwise).
 - The `from` domain must be a verified team domain (422 `The <domain> domain is not verified for this team`). A domain-scoped key must match it (403 `restricted_api_key`).
 - If the team's bounce/complaint rate is at the SES pause line: 403 `sending_paused` — lower it before new campaigns.
+- If the platform's aggregate rate in the sender's SES region is near the SES review line: 403 `broadcasts_paused` — per region, broadcasts only (transactional `/emails` unaffected), clears on its own; retry later.
 
 ## Cancel — POST /broadcasts/{id}/cancel
 
