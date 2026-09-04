@@ -76,6 +76,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `list_domains` | `domains:read` | Verification status; absent on instances without SES configured. |
 | `send_email` | `emails:send` | Full `POST /emails` shape incl. `scheduled_at`, `topic_id`, `attachments`, `headers`. |
 | `create_contact` | `audience:write` | Inline `segments` and `topics` supported; 409 on duplicate email. |
+| `delete_contacts` | `audience:write` | Up to 1,000 contacts per call by `ids` or `emails`; an imported list can be undone in a few calls instead of thousands. |
 | `create_contact_batch` | `audience:write` | Up to 1,000 contacts per call — use it for imports. `on_conflict: skip\|upsert`, `validation: permissive` writes the valid subset and lists failures in `errors`. |
 | `add_suppressions` / `remove_suppressions` / `delete_suppression` | `audience:write` | Batch block/unblock up to 1,000 addresses; `origin` on add keeps an import's reason (`unsubscribe` allowed). |
 | `update_contact` | `audience:write` | Name, `properties`, `unsubscribed`; omitted fields unchanged. |
