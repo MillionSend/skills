@@ -65,4 +65,4 @@ Rate limit: 600 requests/minute per key by default → 429 `rate_limit_exceeded`
 
 ## SDK / errors
 
-Domains and api-keys have no MillionSend SDK surface yet — use REST directly, or the `resend` SDK pointed at MillionSend (`RESEND_BASE_URL`), whose `domains.*` / `apiKeys.*` methods hit these same paths. Errors are `{ statusCode, name, message }`: `not_found` (404), `conflict` (409, duplicate domain), `validation_error` (422), `restricted_api_key` (403).
+Every native MillionSend SDK from 0.4.0 wraps these routes with the Resend SDK's names — Node `ms.domains.create/list/get/verify/update/remove` and `ms.apiKeys.create/list/remove`, Python `millionsend.Domains.*` and `millionsend.ApiKeys.*`, PHP `$ms->domains->*` and `$ms->apiKeys->*`, and the same shape in Ruby, Go, Rust, Java, .NET and Elixir. On an older SDK, or with the `resend` SDK pointed at MillionSend (`RESEND_BASE_URL`), the upstream `domains.*` / `apiKeys.*` methods hit these same paths. Errors are `{ statusCode, name, message }`: `not_found` (404), `conflict` (409, duplicate domain), `validation_error` (422), `restricted_api_key` (403).
