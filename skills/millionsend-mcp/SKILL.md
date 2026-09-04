@@ -1,6 +1,6 @@
 ---
 name: millionsend-mcp
-description: Connect an AI agent to MillionSend's built-in MCP server (Streamable HTTP at /mcp, OAuth sign-in, team-scoped tokens) and use its tools to send emails and manage contacts, segments, topics, broadcasts, and domains. Use when adding MillionSend to Claude Code, Claude Desktop, Cursor, or VS Code via MCP, troubleshooting the OAuth connection, or deciding which MCP tool and permission scope a task needs.
+description: Connect an AI agent to MillionSend's built-in MCP server (Streamable HTTP at /mcp, OAuth sign-in, team-scoped tokens) and use its tools to send emails and manage contacts (one at a time or in batches), suppressions, segments, topics, broadcasts, templates, webhooks, API keys, and domains. Use when adding MillionSend to Claude Code, Claude Desktop, Cursor, or VS Code via MCP, troubleshooting the OAuth connection, or deciding which MCP tool and permission scope a task needs.
 ---
 
 # MillionSend MCP server
@@ -52,7 +52,7 @@ Self-hosted: replace the URL with the instance's own `/mcp` URL.
 
 On first connect the client opens the browser: sign in to MillionSend, pick the **team** the client may act on, and choose the **permissions** (scopes) it gets. No secret ever lands in the client's config. The `/mcp` endpoint does not accept `ms_` API keys — headless/CI automation should call the REST API directly instead.
 
-- The access token is bound to the one team chosen at consent. To act on a different team, sign in again from the client.
+- A grant bound to one team only ever acts on that team. An **All teams** grant covers every team you belong to: every tool gains an optional `team_id` argument (default: your oldest team) and a `list_teams` tool lists the ids; admin-only tools are refused in a team where you are a plain member.
 - Grants are listed under **Settings → Connected apps** in the dashboard, where they can be revoked. Revocation takes effect at the client's next token refresh, within 15 minutes; a member removed from the team loses access immediately.
 - MCP calls share the API's per-minute rate limit (429 with `retry-after` when exceeded).
 
@@ -64,16 +64,25 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | --- | --- | --- |
 | `list_emails` | `emails:read` | Keyset pagination (`limit`, `after`/`before`). |
 | `get_email` | `emails:read` | Delivery status in `last_event`. |
+| `get_usage` | `emails:read` | Plan, daily send/domain limits and today's accepted count — check before bulk work. |
 | `list_contacts` | `audience:read` | Pass `segment_id` for one segment's members. |
 | `get_contact` | `audience:read` | By contact id **or** email address. |
 | `list_segments` | `audience:read` | The targets broadcasts are sent to. |
 | `list_topics` | `audience:read` | Subscription topics. |
+| `list_suppressions` / `get_suppression` | `audience:read` | Blocked addresses; filter by `origin` (bounce, complaint, manual, unsubscribe). |
+| `list_templates` / `get_template` | `templates:read` | Templates by id or alias. |
+| `list_api_keys` | `api-keys:write` | Active keys, never their tokens. |
 | `list_domains` | `domains:read` | Verification status; absent on instances without SES configured. |
 | `send_email` | `emails:send` | Full `POST /emails` shape incl. `scheduled_at`, `topic_id`, `attachments`, `headers`. |
 | `create_contact` | `audience:write` | Inline `segments` and `topics` supported; 409 on duplicate email. |
+| `create_contact_batch` | `audience:write` | Up to 1,000 contacts per call — use it for imports. `on_conflict: skip\|upsert`, `validation: permissive` writes the valid subset and lists failures in `errors`. |
+| `add_suppressions` / `remove_suppressions` / `delete_suppression` | `audience:write` | Batch block/unblock up to 1,000 addresses; `origin` on add keeps an import's reason (`unsubscribe` allowed). |
 | `update_contact` | `audience:write` | Name, `properties`, `unsubscribed`; omitted fields unchanged. |
 | `add_contact_to_segment` | `audience:write` | Idempotent. |
 | `create_broadcast` | `broadcasts:write` | Draft by default; `send: true` sends immediately. |
 | `send_broadcast` | `broadcasts:write` | Send a draft now or with `scheduled_at`. |
+| `create_template` / `update_template` / `delete_template` | `templates:write` | Every save is live; no draft/publish cycle. |
+| `create_api_key` / `revoke_api_key` | `api-keys:write` | **Owner/admin only.** The token is returned only by `create_api_key`, once — store it immediately. Lets an MCP-only onboarding mint the key the REST calls need. |
+| `create_domain` / `update_domain` / `verify_domain` / `delete_domain` | `domains:write` | **Owner/admin only.** `region` is optional and must be the one region the instance serves. |
 
-Errors surface as the REST API's `{ statusCode, name, message }` bodies — an unverified sender domain fails `send_email` exactly as it fails `POST /emails` (422); a suppressed-only recipient list, topic opt-outs, and `sending_paused` behave identically. Anything the tools don't cover (deleting contacts, webhooks, API keys, domain creation) is REST-only — see the other millionsend skills.
+Errors surface as the REST API's `{ statusCode, name, message }` bodies — an unverified sender domain fails `send_email` exactly as it fails `POST /emails` (422); a suppressed-only recipient list, topic opt-outs, and `sending_paused` behave identically. The full tool list (including webhooks, contact properties and deletes) is under **Settings → MCP** in the dashboard and in the docs; tools that manage domains, webhooks and API keys are offered only to owners and admins.
