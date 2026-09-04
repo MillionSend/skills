@@ -67,6 +67,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `get_usage` | `emails:read` | Plan, daily send/domain limits and today's accepted count — check before bulk work. |
 | `list_contacts` | `audience:read` | Pass `segment_id` for one segment's members. |
 | `get_contact` | `audience:read` | By contact id **or** email address. |
+| `get_contact_topics` | `audience:read` | Every topic with the contact's effective subscription and an `explicit` flag; by id or email. |
 | `list_segments` | `audience:read` | The targets broadcasts are sent to. |
 | `list_topics` | `audience:read` | Subscription topics. |
 | `list_suppressions` / `get_suppression` | `audience:read` | Blocked addresses; filter by `origin` (bounce, complaint, manual, unsubscribe). |

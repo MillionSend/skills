@@ -125,6 +125,7 @@ curl -X PATCH "$MILLIONSEND_BASE_URL/contacts/ana@example.com/topics" \
   -H "Content-Type: application/json" \
   -d '[{ "id": "<topic-uuid>", "subscription": "opt_out" }]'
 ```
+- Read them back — `GET /contacts/{id}/topics` → `{ object: "list", data: [{ id, name, description, subscription, explicit }], has_more: false }`: every topic of the team with the contact's effective `subscription` (explicit choice, else the topic default) and `explicit: false` when it is the default. `id` is the contact id or email.
 
 ## Suppressions — /suppressions
 
