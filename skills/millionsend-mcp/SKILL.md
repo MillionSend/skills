@@ -78,7 +78,6 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `create_contact` | `audience:write` | Inline `segments` and `topics` supported; 409 on duplicate email. |
 | `delete_contacts` | `audience:write` | Up to 1,000 contacts per call by `ids` or `emails`; an imported list can be undone in a few calls instead of thousands. |
 | `create_contact_preferences_link` | `audience:write` | The contact's hosted preference-center URL (no expiry; hand it only to the contact). |
-| `rotate_webhook_secret` | `webhooks:write` | **admin.** New `whsec_` secret; the previous one keeps signing for `overlap_hours` (default 24) so receivers switch without a gap. |
 | `create_contact_batch` | `audience:write` | Up to 1,000 contacts per call — use it for imports. `on_conflict: skip\|upsert`, `validation: permissive` writes the valid subset and lists failures in `errors`. |
 | `add_suppressions` / `remove_suppressions` / `delete_suppression` | `audience:write` | Batch block/unblock up to 1,000 addresses; `origin` on add keeps an import's reason (`unsubscribe` allowed). |
 | `update_contact` | `audience:write` | Name, `properties`, `unsubscribed`; omitted fields unchanged. |
@@ -86,7 +85,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `create_broadcast` | `broadcasts:write` | Draft by default; `send: true` sends immediately. |
 | `send_broadcast` | `broadcasts:write` | Send a draft now or with `scheduled_at`. |
 | `create_template` / `update_template` / `delete_template` | `templates:write` | Every save is live; no draft/publish cycle. |
-| `create_api_key` / `revoke_api_key` | `api-keys:write` | **Owner/admin only.** The token is returned only by `create_api_key`, once — store it immediately. Lets an MCP-only onboarding mint the key the REST calls need. |
+| `revoke_api_key` | `api-keys:write` | **Owner/admin only.** No MCP tool returns a credential: API keys are created, and webhook signing secrets read or rotated, only in the dashboard or through the REST API. |
 | `create_domain` / `update_domain` / `verify_domain` / `delete_domain` | `domains:write` | **Owner/admin only.** `region` is optional and must be the one region the instance serves. |
 
 Errors surface as the REST API's `{ statusCode, name, message }` bodies — an unverified sender domain fails `send_email` exactly as it fails `POST /emails` (422); a suppressed-only recipient list, topic opt-outs, and `sending_paused` behave identically. The full tool list (including webhooks, contact properties and deletes) is under **Settings → MCP** in the dashboard and in the docs; tools that manage domains, webhooks and API keys are offered only to owners and admins.
