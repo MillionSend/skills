@@ -86,6 +86,7 @@ Two settings change: host → the MillionSend instance host, port `2587`; userna
 6. **Templates have no draft/publish cycle or versions**: every save is live, `status` is always `published`, `POST /templates/{id}/publish` is a no-op; `from`, `reply_to` and `variables` are rejected with 422 (not dropped) and read back as `null`/`null`/`[]`; every single-template route takes an id **or alias**.
 7. **Suppressions**: same `/suppressions` wire as Resend, plus `origin: "unsubscribe"` (retained one-click opt-outs — a value outside the SDK's `SuppressionOrigin` union), batch bodies of up to 1000 (Resend: 100), an optional `origin: "bounce" | "complaint" | "manual"` on `POST /suppressions` and `batch/add` (default `manual`; `unsubscribe` → 422; absent from the SDK's `AddSuppressionOptions`, send it raw), and an idempotent `POST /suppressions` (an already-suppressed address returns its existing id, origin unchanged). The CLI carries Resend's bounce/complaint lists over with their origin; by hand, `POST /suppressions/batch/add` with `origin`.
 8. **Delivery events**: SES's `temporary_failure` maps to `pending` on the wire; hard bounces/complaints auto-suppress the address, and a send where every recipient is suppressed (or opted out of its `topic_id`) fails with `422 all_recipients_suppressed` (message `All recipients are suppressed`).
+9. **Recipients that can never receive mail are refused**: a `to`/`cc`/`bcc` address under a reserved name (`.test`, `.invalid`, `.local`, …), at `example.com`/`.net`/`.org`, or under a TLD that doesn't exist (`gmail.con`) is a 422 `validation_error` naming it (SMTP: `550 5.1.2` at `RCPT TO`). Creating such a contact is refused too, so the CLI lists those contacts as failed (exit 3). Send test mail to `success@simulator.amazonses.com` (the SES mailbox simulator) instead.
 
 Superset features (safe to ignore; use when wanted): `POST /contacts/batch?on_conflict=error|skip|upsert` (1–1000 contacts per call; never re-subscribes an unsubscribed contact), typed `/contact-properties`, segment `filter` expressions, topic `visibility`, natural-language `scheduled_at` (Resend-compatible anyway), batch `x-batch-validation: permissive` (emails and contacts), `GET /openapi.json` (the full OpenAPI document of the instance).
 
@@ -95,7 +96,7 @@ Superset features (safe to ignore; use when wanted): `POST /contacts/batch?on_co
 curl -X POST "$MILLIONSEND_BASE_URL/emails" \
   -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "from": "Acme <onboarding@acme.dev>", "to": "you@example.com", "subject": "Migrated", "text": "Hello from MillionSend" }'
+  -d '{ "from": "Acme <onboarding@acme.dev>", "to": "success@simulator.amazonses.com", "subject": "Migrated", "text": "Hello from MillionSend" }'
 ```
 
 A 422 `The <domain> domain is not verified for this team` means the DNS re-verification step is still pending — everything else is already working.
