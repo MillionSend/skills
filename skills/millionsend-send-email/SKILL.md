@@ -20,7 +20,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/emails" \
   -H "Content-Type: application/json" \
   -d '{
     "from": "Acme <onboarding@acme.dev>",
-    "to": ["user@example.com"],
+    "to": ["success@simulator.amazonses.com"],
     "subject": "Welcome",
     "html": "<p>It works!</p>"
   }'
@@ -30,7 +30,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/emails" \
 Request fields (Resend-shaped, snake_case):
 
 - `from` (required) — exactly one mailbox; display name allowed (`"Acme <x@acme.dev>"`).
-- `to` (required) — string or array, max 50 recipients. `cc`, `bcc`, `reply_to` same shape.
+- `to` (required) — string or array, max 50 recipients. `cc`, `bcc`, `reply_to` same shape. A `to`/`cc`/`bcc` address on a domain that can never receive mail — a reserved name (`.test`, `.invalid`, `.local`, …), `example.com`/`.net`/`.org`, or a TLD that doesn't exist (`gmail.con`) — is a 422 `validation_error` naming it. To test without emailing anyone, send to `success@simulator.amazonses.com` (the SES mailbox simulator; the email shows as `delivered`).
 - `subject` (required); at least one of `html` / `text` (required).
 - `scheduled_at` — ISO 8601 **with offset** (`2026-09-01T10:00:00-03:00`) or a relative time: `in N min(s)/minute(s)/hour(s)/day(s)` ("in 5 mins", "in 2 hours", "in 1 day"). Max 30 days ahead.
 - `tags` — `[{ "name": "...", "value": "..." }]`.
@@ -44,7 +44,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/emails" \
   -H "Content-Type: application/json" \
   -d '{
     "from": "Acme <billing@acme.dev>",
-    "to": "user@example.com",
+    "to": "success@simulator.amazonses.com",
     "subject": "Your invoice",
     "text": "Attached.",
     "scheduled_at": "in 2 hours",
@@ -87,7 +87,7 @@ import { MillionSend } from "millionsend";
 const ms = new MillionSend("ms_123", { baseUrl: "https://api.millionsend.com" });
 const { data, error } = await ms.emails.send({
   from: "Acme <onboarding@acme.dev>",
-  to: "user@example.com",
+  to: "success@simulator.amazonses.com",
   subject: "Welcome",
   html: "<p>It works!</p>",
 });
@@ -107,7 +107,7 @@ millionsend.base_url = "https://api.millionsend.com"
 
 email = millionsend.Emails.send({
     "from": "Acme <onboarding@acme.dev>",
-    "to": "user@example.com",
+    "to": "success@simulator.amazonses.com",
     "subject": "Welcome",
     "html": "<p>It works!</p>",
 })
@@ -122,4 +122,4 @@ Every error body is `{ "statusCode": <int>, "name": "<code>", "message": "<human
 
 ## SMTP relay (for software that only speaks SMTP)
 
-Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events).
+Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events); a recipient on a domain that can never receive mail is refused at `RCPT TO` with `550 5.1.2`, and the other recipients are still accepted.

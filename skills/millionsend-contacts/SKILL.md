@@ -16,7 +16,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/contacts" \
   -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "ana@example.com",
+    "email": "success+ana@simulator.amazonses.com",
     "first_name": "Ana",
     "last_name": "Silva",
     "unsubscribed": false,
@@ -26,7 +26,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/contacts" \
   }'
 ```
 
-- `email` must be a bare address (no display name).
+- `email` must be a bare address (no display name). An address on a domain that can never receive mail — a reserved name (`.test`, `.invalid`, `.local`, …), `example.com`/`.net`/`.org`, or a TLD that doesn't exist (`gmail.con`) — is a 422 `validation_error`; in `POST /contacts/batch` only rows that would create a contact are refused. For test contacts, label the SES mailbox simulator's address as above: `success+<label>@simulator.amazonses.com`.
 - `properties` is a flat map; scalar values are accepted (stored as strings), nested objects/arrays are a 422. Reads type them back per the team's property definitions.
 - `segments` / `topics` are optional initial associations, written in the same transaction as the contact; a missing segment/topic id → 404.
 
@@ -56,8 +56,8 @@ curl -X POST "$MILLIONSEND_BASE_URL/contacts/batch?on_conflict=upsert" \
   -H "Content-Type: application/json" \
   -H "x-batch-validation: permissive" \
   -d '[
-    { "email": "ana@example.com", "first_name": "Ana", "properties": { "plan": "pro" } },
-    { "email": "bob@example.com", "segments": [{ "id": "<segment-uuid>" }] }
+    { "email": "success+ana@simulator.amazonses.com", "first_name": "Ana", "properties": { "plan": "pro" } },
+    { "email": "success+bob@simulator.amazonses.com", "segments": [{ "id": "<segment-uuid>" }] }
   ]'
 # → { "data": [{ "object": "contact", "index": 0, "id": "<uuid>", "status": "updated" }, { "object": "contact", "index": 1, "id": "<uuid>", "status": "created" }],
 #     "counts": { "created": 1, "updated": 1, "skipped": 0, "failed": 0 } }
@@ -127,7 +127,7 @@ Topics model opt-in/opt-out categories (e.g. "Product news"). `default_subscript
 - Set a contact's subscriptions — `PATCH /contacts/{id}/topics` with a **bare array** body:
 
 ```sh
-curl -X PATCH "$MILLIONSEND_BASE_URL/contacts/ana@example.com/topics" \
+curl -X PATCH "$MILLIONSEND_BASE_URL/contacts/success+ana@simulator.amazonses.com/topics" \
   -H "Authorization: Bearer $MILLIONSEND_API_KEY" \
   -H "Content-Type: application/json" \
   -d '[{ "id": "<topic-uuid>", "subscription": "opt_out" }]'
