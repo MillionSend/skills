@@ -10,6 +10,7 @@ Base URL: `https://api.millionsend.com` (cloud) or the instance's own API origin
 ## Prerequisites
 
 - The `from` address's domain must be a **verified domain** of the team (dashboard → Domains, or the `/domains` API — see the millionsend-domains skill). Otherwise: 422 `The <domain> domain is not verified for this team`.
+- A `GET /domains` row with `shared: true` (the team's shared inbox subdomain, v0.14.0+) reads `verified`, yet sends only from its inboxes' own addresses: `from` must be one inbox's address exactly (no `+tag`; a display name only if it is the inbox's `from_name`), without `scheduled_at`, `reply_to`, `attachments` or `headers` (422 `validation_error` otherwise), and only where that inbox may start conversations (403 `inbox_send_policy` otherwise). `POST /emails/batch`, broadcasts and the SMTP relay always refuse it (403 `inbox_send_policy`; SMTP `550 5.7.1`). Send everything else from a `shared: false` row.
 - A key with `sending_access` permission can only use `/emails*` routes. A domain-scoped key can only send from its assigned domain (403 `restricted_api_key` otherwise).
 
 ## Send one email — POST /emails

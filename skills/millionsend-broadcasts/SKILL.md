@@ -62,7 +62,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/broadcasts/$ID/send" \
 Only drafts can be sent (400 `invalid_parameter` otherwise). Preconditions checked at send time (all return the standard `{ statusCode, name, message }` error body):
 
 - The instance must have `APP_BASE_URL` set — unsubscribe links are built from it (422 otherwise).
-- The `from` domain must be a verified team domain (422 `The <domain> domain is not verified for this team`). A domain-scoped key must match it (403 `restricted_api_key`).
+- The `from` domain must be a verified team domain (422 `The <domain> domain is not verified for this team`). A domain-scoped key must match it (403 `restricted_api_key`). An address on the team's shared inbox subdomain (the `shared: true` row of `GET /domains`, though it reads `verified`) is refused with 403 `inbox_send_policy`.
 - If the team's bounce/complaint rate is at the SES pause line: 403 `sending_paused` — lower it before new campaigns.
 - If the platform's aggregate rate in the sender's SES region is near the SES review line: 403 `broadcasts_paused` — per region, broadcasts only (transactional `/emails` unaffected), clears on its own; retry later.
 
