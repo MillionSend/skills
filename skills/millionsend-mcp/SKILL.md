@@ -53,7 +53,8 @@ Self-hosted: replace the URL with the instance's own `/mcp` URL.
 On first connect the client opens the browser: sign in to MillionSend, pick the **team** the client may act on, and choose the **permissions** (scopes) it gets. No secret ever lands in the client's config. The `/mcp` endpoint does not accept `ms_` API keys — headless/CI automation should call the REST API directly instead.
 
 - A grant bound to one team only ever acts on that team. An **All teams** grant covers every team you belong to: every tool gains an optional `team_id` argument (default: your oldest team) and a `list_teams` tool lists the ids; admin-only tools are refused in a team where you are a plain member.
-- Grants are listed under **Settings → Connected apps** in the dashboard, where they can be revoked. Revocation takes effect at the client's next token refresh, within 15 minutes; a member removed from the team loses access immediately.
+- Every client gets a refresh token, so the hour-long access token renews without signing in again. **Stay connected**, chosen at consent, sets how long the grant lasts: until disconnected (the default), 1 year, 90 days or 30 days; after that the client asks to sign in again.
+- Grants are listed under **Settings → Connected apps** in the dashboard, with when each one ends, and can be revoked there. Revocation takes effect at the client's next token refresh, within an hour; a member removed from the team loses access immediately.
 - MCP calls share the API's per-minute rate limit (429 with `retry-after` when exceeded).
 
 ## Tools

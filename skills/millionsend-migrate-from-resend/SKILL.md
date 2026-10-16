@@ -36,7 +36,7 @@ What moves and how (re-run safe — the same command right before cutover syncs 
 
 Flags that change what happens: `--only a,b` / `--skip a,b` (`domains, properties, topics, segments, contacts, enrichment, broadcasts, templates, webhooks, suppressions, api-keys`), `--rps N` (default 8; the CLI prints the limit Resend reports on connect and warns above it — go past 10 only after Resend raised the team limit), `--on-conflict upsert|skip|error`, `--fresh` (ignore the state file), `--json` (JSON on stdout, progress on stderr), `--verbose`, `--report <file>`. Files land in `.millionsend/` (mode 0600, never a key; appended to `.gitignore` when one exists).
 
-Before any write the plan checks the target's `GET /usage` (plan, `emails_per_day` / `domains` limits, cloud flag) and refuses or warns precisely ("7 domains to create; the Free plan allows 3").
+Before any write the plan checks the target's `GET /usage` (plan, `emails_per_day` / `domains` limits, cloud flag) and refuses or warns precisely ("7 domains to create; the Free plan allows 3"). Use CLI 0.2.3 or later against MillionSend v0.14.0+: older versions count the target's shared inbox subdomain (the `shared: true` row of `GET /domains`) against that domain limit.
 
 ## Path 1 — keep the Resend SDK, change env vars only
 

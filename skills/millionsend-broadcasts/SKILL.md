@@ -25,7 +25,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/broadcasts" \
 # → { "id": "<broadcast uuid>" }
 ```
 
-- `from` (single mailbox, display name ok) and `subject` required; at least one of `html`/`text`. Optional: `name`, `reply_to`, `preview_text` (inbox preview — injected as a hidden preheader at fan-out).
+- `from` (single mailbox, display name ok) and `subject` (≤ 998 chars) required; at least one of `html`/`text`. Optional: `name`, `reply_to`, `preview_text` (inbox preview — injected as a hidden preheader at fan-out).
 - **Targeting**: omit both `segment_id` and `topic_id` → every non-unsubscribed contact. `segment_id` → contacts the segment resolves to (saved filter matches ∪ manual members). `topic_id` → only contacts subscribed to that topic (default subscription + per-contact overrides). Both together intersect.
 - **Send on create**: `"send": true` sends immediately; add `"scheduled_at"` (requires `send: true`) to schedule instead — ISO 8601 with offset or a relative time (`"in 1 hour"`, `"in 2 days"`), max 30 days ahead.
 

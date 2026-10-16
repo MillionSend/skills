@@ -32,7 +32,7 @@ Request fields (Resend-shaped, snake_case):
 
 - `from` (required) — exactly one mailbox; display name allowed (`"Acme <x@acme.dev>"`).
 - `to` (required) — string or array, max 50 recipients. `cc`, `bcc`, `reply_to` same shape. A `to`/`cc`/`bcc` address on a domain that can never receive mail — a reserved name (`.test`, `.invalid`, `.local`, …), `example.com`/`.net`/`.org`, or a TLD that doesn't exist (`gmail.con`) — is a 422 `validation_error` naming it. To test without emailing anyone, send to `success@simulator.amazonses.com` (the SES mailbox simulator; the email shows as `delivered`).
-- `subject` (required); at least one of `html` / `text` (required).
+- `subject` (required, up to 998 characters; longer is a 422); at least one of `html` / `text` (required).
 - `scheduled_at` — ISO 8601 **with offset** (`2026-09-01T10:00:00-03:00`) or a relative time: `in N min(s)/minute(s)/hour(s)/day(s)` ("in 5 mins", "in 2 hours", "in 1 day"). Max 30 days ahead.
 - `tags` — `[{ "name": "...", "value": "..." }]`.
 - `topic_id` — a topic UUID: recipients opted out of that topic are dropped at accept (like suppression hits), an RFC 8058 `List-Unsubscribe` header is added, and the literal tokens `{{{UNSUBSCRIBE_URL}}}` / `{{{RESEND_UNSUBSCRIBE_URL}}}` in the body are replaced with a per-recipient unsubscribe link.
@@ -123,4 +123,4 @@ Every error body is `{ "statusCode": <int>, "name": "<code>", "message": "<human
 
 ## SMTP relay (for software that only speaks SMTP)
 
-Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events); a recipient on a domain that can never receive mail is refused at `RCPT TO` with `550 5.1.2`, and the other recipients are still accepted.
+Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events); a recipient on a domain that can never receive mail is refused at `RCPT TO` with `550 5.1.2`, and the other recipients are still accepted. Each message spends one unit of the key's per-minute budget, the same one its API calls spend (default 600), and a team sends at most 3,000 a minute: past either, the relay answers `451 4.7.1` at `MAIL FROM` with the seconds left, before the message is sent, so the client keeps it and retries. A subject over 998 characters is a `554`.

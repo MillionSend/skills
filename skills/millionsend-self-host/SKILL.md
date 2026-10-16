@@ -55,7 +55,7 @@ From the dashboard after boot (Domains → add domain → it shows the DKIM CNAM
 
 ## SMTP relay
 
-For software that only speaks SMTP. Host: the Docker host; port `2587` (`SMTP_PORT` to change); username `millionsend` (fixed); password: an `ms_` API key from the dashboard. STARTTLS is offered (and required before AUTH) when `SMTP_TLS_CERT_PATH`/`SMTP_TLS_KEY_PATH` point at a PEM keypair; **without one the relay refuses to start** unless `SMTP_ALLOW_INSECURE_AUTH=true` is set explicitly — do that only on a trusted private network with `SMTP_BIND_ADDRESS=127.0.0.1`, never on a public bind (AUTH would send the API key in plaintext). Same accept pipeline as `POST /emails`. The service is in the compose files; remove it if unused.
+For software that only speaks SMTP. Host: the Docker host; port `2587` (`SMTP_PORT` to change); username `millionsend` (fixed); password: an `ms_` API key from the dashboard. STARTTLS is offered (and required before AUTH) when `SMTP_TLS_CERT_PATH`/`SMTP_TLS_KEY_PATH` point at a PEM keypair; **without one the relay refuses to start** unless `SMTP_ALLOW_INSECURE_AUTH=true` is set explicitly — do that only on a trusted private network with `SMTP_BIND_ADDRESS=127.0.0.1`, never on a public bind (AUTH would send the API key in plaintext). Same accept pipeline as `POST /emails`. Each message spends one unit of the sending key's per-minute budget, `API_RATE_LIMIT_PER_MINUTE` (default 600, shared with its API calls, so raising it raises the API's limit too), and a team sends at most 3,000 a minute; past either the relay answers `451 4.7.1` and the client retries. The service is in the compose files; remove it if unused.
 
 ## Operations gotchas
 
