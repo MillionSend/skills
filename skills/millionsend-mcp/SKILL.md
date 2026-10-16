@@ -62,7 +62,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 
 | Tool | Scope | Notes |
 | --- | --- | --- |
-| `list_emails` | `emails:read` | Keyset pagination (`limit`, `after`/`before`). |
+| `list_emails` | `emails:read` | Keyset pagination (`limit`, `after`/`before`), newest first since v0.13.0: to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`. |
 | `get_email` | `emails:read` | Delivery status in `last_event`. |
 | `get_usage` | `emails:read` | Plan, daily send/domain limits and today's accepted count — check before bulk work. |
 | `list_contacts` | `audience:read` | Pass `segment_id` for one segment's members. |

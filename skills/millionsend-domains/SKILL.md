@@ -32,7 +32,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/domains/4ef9a417-02e9-4d39-ad75-9611e0fcc33c
 
 Triggers a live SES + DNS check and updates the stored `status`; read the result back with `GET /domains/{id}` (which also returns `records[]` with per-record status). A worker cron re-checks periodically too. Sending from the domain is refused until `status` is `verified`.
 
-Other routes: `GET /domains` (keyset list: `limit` 1–100, `after`/`before` cursors) · `GET /domains/{id}` · `DELETE /domains/{id}` → `{ "object": "domain", "id": ..., "deleted": true }`.
+Other routes: `GET /domains` (keyset list: `limit` 1–100, `after`/`before` cursors) · `GET /domains/{id}` · `DELETE /domains/{id}` → `{ "object": "domain", "id": ..., "deleted": true }`. The list runs newest first since v0.13.0: `after` takes a page's last id and pages toward older domains; to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`.
 
 ## Tracking — PATCH /domains/{id}
 

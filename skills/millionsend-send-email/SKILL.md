@@ -73,7 +73,7 @@ Body is a **bare JSON array** of send objects, 1–100 items. Items take the ful
 
 ## Get, reschedule, cancel
 
-- `GET /emails?limit=&after=|before=` — keyset pagination (`limit` 1–100 default 20, cursors are item ids, `after`/`before` mutually exclusive) → `{ object: "list", data: [...], has_more }`.
+- `GET /emails?limit=&after=|before=` — keyset pagination (`limit` 1–100 default 20, cursors are item ids, `after`/`before` mutually exclusive) → `{ object: "list", data: [...], has_more }`. Newest first since v0.13.0: `after` takes a page's last id and pages toward older emails; to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`.
 - `GET /emails/{id}` → `{ object: "email", id, from, to, subject, html, text, last_event, scheduled_at, ... }`. `last_event` is the delivery status (`queued`, `sent`, `delivered`, `bounced`, `complained`, ...).
 - `PATCH /emails/{id}` with `{ "scheduled_at": "..." }` (ISO or relative) — reschedules a **not-yet-sent scheduled** email → `{ object: "email", id }`.
 - `POST /emails/{id}/cancel` — cancels a scheduled, not-yet-sent email only (immediate sends cannot be canceled). Returns `{ object: "email", id }`.
