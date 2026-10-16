@@ -1,6 +1,6 @@
 ---
 name: millionsend-mcp
-description: Connect an AI agent to MillionSend's built-in MCP server (Streamable HTTP at /mcp, OAuth sign-in, team-scoped tokens) and use its tools to send emails and manage contacts (one at a time or in batches), suppressions, segments, topics, broadcasts, templates, webhooks, API keys, and domains. Use when adding MillionSend to Claude Code, Claude Desktop, Cursor, or VS Code via MCP, troubleshooting the OAuth connection, or deciding which MCP tool and permission scope a task needs.
+description: Connect an AI agent to MillionSend's built-in MCP server (Streamable HTTP at /mcp, OAuth sign-in, team-scoped tokens) and use its tools to send emails and manage contacts (one at a time or in batches), suppressions, segments, topics, broadcasts, templates, webhooks, API keys, domains, and inboxes. Use when adding MillionSend to Claude Code, Claude Desktop, Cursor, or VS Code via MCP, giving an agent its own inbox, troubleshooting the OAuth connection, or deciding which MCP tool and permission scope a task needs.
 ---
 
 # MillionSend MCP server
@@ -53,7 +53,8 @@ Self-hosted: replace the URL with the instance's own `/mcp` URL.
 On first connect the client opens the browser: sign in to MillionSend, pick the **team** the client may act on, and choose the **permissions** (scopes) it gets. No secret ever lands in the client's config. The `/mcp` endpoint does not accept `ms_` API keys — headless/CI automation should call the REST API directly instead.
 
 - A grant bound to one team only ever acts on that team. An **All teams** grant covers every team you belong to: every tool gains an optional `team_id` argument (default: your oldest team) and a `list_teams` tool lists the ids; admin-only tools are refused in a team where you are a plain member.
-- Grants are listed under **Settings → Connected apps** in the dashboard, where they can be revoked. Revocation takes effect at the client's next token refresh, within 15 minutes; a member removed from the team loses access immediately.
+- Every client gets a refresh token, so the hour-long access token renews without signing in again. **Stay connected**, chosen at consent, sets how long the grant lasts: until disconnected (the default), 1 year, 90 days or 30 days; after that the client asks to sign in again.
+- Grants are listed under **Settings → Connected apps** in the dashboard, with when each one ends, and can be revoked there. Revocation takes effect at the client's next token refresh, within an hour; a member removed from the team loses access immediately.
 - MCP calls share the API's per-minute rate limit (429 with `retry-after` when exceeded).
 
 ## Tools
@@ -62,7 +63,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 
 | Tool | Scope | Notes |
 | --- | --- | --- |
-| `list_emails` | `emails:read` | Keyset pagination (`limit`, `after`/`before`). |
+| `list_emails` | `emails:read` | Keyset pagination (`limit`, `after`/`before`), newest first since v0.13.0: to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`. |
 | `get_email` | `emails:read` | Delivery status in `last_event`. |
 | `get_usage` | `emails:read` | Plan, daily send/domain limits and today's accepted count — check before bulk work. |
 | `list_contacts` | `audience:read` | Pass `segment_id` for one segment's members. |
@@ -73,7 +74,7 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `list_suppressions` / `get_suppression` | `audience:read` | Blocked addresses; filter by `origin` (bounce, complaint, manual, unsubscribe). |
 | `list_templates` / `get_template` | `templates:read` | Templates by id or alias. |
 | `list_api_keys` | `api-keys:write` | Active keys, never their tokens. |
-| `list_domains` | `domains:read` | Verification status; absent on instances without SES configured. |
+| `list_domains` | `domains:read` | Up to 100 rows with verification status; the team's shared inbox subdomain is the last row (`shared: true`, read-only). Absent on instances without SES configured. |
 | `send_email` | `emails:send` | Full `POST /emails` shape incl. `scheduled_at`, `topic_id`, `attachments`, `headers`. |
 | `create_contact` | `audience:write` | Inline `segments` and `topics` supported; 409 on duplicate email. |
 | `delete_contacts` | `audience:write` | Up to 1,000 contacts per call by `ids` or `emails`; an imported list can be undone in a few calls instead of thousands. |
@@ -86,6 +87,18 @@ Each tool requires a permission scope granted at consent; clients only see the t
 | `send_broadcast` | `broadcasts:write` | Send a draft now or with `scheduled_at`. |
 | `create_template` / `update_template` / `delete_template` | `templates:write` | Every save is live; no draft/publish cycle. |
 | `revoke_api_key` | `api-keys:write` | **Owner/admin only.** No MCP tool returns a credential: API keys are created, and webhook signing secrets read or rotated, only in the dashboard or through the REST API. |
-| `create_domain` / `update_domain` / `verify_domain` / `delete_domain` | `domains:write` | **Owner/admin only.** `region` is optional and must be the one region the instance serves. |
+| `create_domain` / `update_domain` / `verify_domain` / `delete_domain` | `domains:write` | **Owner/admin only.** `region` is optional and must be the one region the instance serves. The shared inbox subdomain answers 403 to update, verify and delete. |
+| `create_inbox` | `receiving:manage` | Agent inboxes only. `domain_id` takes a `list_domains` row, `username` names the address (random when left out), and `accept_from` is the one safety setting it takes. See below. |
 
 Errors surface as the REST API's `{ statusCode, name, message }` bodies — an unverified sender domain fails `send_email` exactly as it fails `POST /emails` (422); a suppressed-only recipient list, topic opt-outs, and `sending_paused` behave identically. The full tool list (including webhooks, contact properties and deletes) is under **Settings → MCP** in the dashboard and in the docs; tools that manage domains, webhooks and API keys are offered only to owners and admins.
+
+## Set up an agent inbox
+
+An agent can give itself an address that receives mail, with no DNS, on the team's subdomain of the instance's shared inbox domain (MillionSend v0.14.0+):
+
+1. `list_domains` (`domains:read`). The team's subdomain, such as `acme.agents.example`, is the **last** row, the one with `shared: true`.
+2. `create_inbox` (`receiving:manage`) with that row's `id` as `domain_id`, plus an optional `username` (the part before the `@`; random when left out), `name`, `from_name` and `expires_in`. It answers the inbox, whose `email_address` is then e.g. `orders@acme.agents.example`.
+
+- A grant with `receiving:manage` but without `domains:read` can't list domains; it leaves `domain_id` (and `email_address`) out of `create_inbox`, which also means the shared subdomain.
+- No `shared: true` row: call `create_inbox` without `domain_id` anyway. A 422 means the instance has no shared inbox domain: pass one of the team's verified domains with receiving on as `domain_id`, plus `username`. A 503 `name_review_unavailable` means the team's subdomain still waits for its name review: retry in about 5 minutes (`retry-after: 300` on the REST API).
+- With a `username` or `from_name`, the same 503 can also mean that name couldn't be reviewed right now (`retry-after: 60`): retry shortly, or leave `username` out for a random address.

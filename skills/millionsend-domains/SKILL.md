@@ -32,7 +32,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/domains/4ef9a417-02e9-4d39-ad75-9611e0fcc33c
 
 Triggers a live SES + DNS check and updates the stored `status`; read the result back with `GET /domains/{id}` (which also returns `records[]` with per-record status). A worker cron re-checks periodically too. Sending from the domain is refused until `status` is `verified`.
 
-Other routes: `GET /domains` (keyset list: `limit` 1–100, `after`/`before` cursors) · `GET /domains/{id}` · `DELETE /domains/{id}` → `{ "object": "domain", "id": ..., "deleted": true }`.
+Other routes: `GET /domains` (keyset list: `limit` 1–100, `after`/`before` cursors) · `GET /domains/{id}` · `DELETE /domains/{id}` → `{ "object": "domain", "id": ..., "deleted": true }`. The list runs newest first since v0.13.0: `after` takes a page's last id and pages toward older domains; to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`.
 
 ## Tracking — PATCH /domains/{id}
 
@@ -47,6 +47,17 @@ curl -X PATCH "$MILLIONSEND_BASE_URL/domains/$ID" \
 - `tracking_subdomain` — branded tracking host label (`track` → `track.acme.dev`); `""` or `null` clears it.
 - `tls` and `capabilities` (accepted by Resend's SDK types) are **not supported**: 422, never silently ignored.
 
+## Shared inbox subdomain (read-only)
+
+On an instance with a shared inbox domain (self-hosted: `SHARED_INBOX_DOMAIN`), `GET /domains` (v0.14.0+) ends with the team's subdomain of it, such as `acme.agents.example`, where the team's shared inboxes get their addresses. Every row carries `shared`; this one has `shared: true`, `status: "verified"`, `records: []`, receiving on, and tracking and catch-all off.
+
+- `sending_mode` — what addresses on it may send now: `open` (start conversations), `reply_only` (reply inside their threads) or `receive_only` (nothing goes out; `capabilities.sending` reads `disabled`). `sending_mode_reason` says why it is below `open`: `plan` or `instance` (`null` when open). Each inbox's own rules apply on top.
+- Read-only: `PATCH`, `POST /domains/{id}/verify` and `DELETE` on it answer 403 `forbidden`.
+- Not counted toward the plan's domain limit.
+- Sorts after every own domain, so it is the last row; its id is a cursor like any other.
+- Though `verified`, it sends only from its inboxes' own addresses (see the millionsend-send-email skill), and `POST /api-keys` refuses its id as `domain_id` with 422 `validation_error`.
+- Create an inbox on it with `POST /inboxes` and `{ "domain_id": "<its id>", "username": "orders" }` (no `username` → a random address). A team whose subdomain still waits for its name review has no row yet, and until then that call answers 503 `name_review_unavailable` with `retry-after: 300`.
+
 ## API keys — /api-keys
 
 ```sh
@@ -58,7 +69,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/api-keys" \
 ```
 
 - `permission` — `full_access` (default; everything) or `sending_access` (confined to `/emails*`; any management route is 403 `restricted_api_key`).
-- `domain_id` — optional; scopes the key to sending from that one domain. Must be a **verified** domain of the team (422 otherwise).
+- `domain_id` — optional; scopes the key to sending from that one domain. Must be a **verified** domain of the team, a `GET /domains` row with `shared: false` (422 otherwise, the shared inbox subdomain included).
 - The `token` (`ms_` prefix) is returned **only on create** — store it immediately. `GET /api-keys` lists metadata only (`id`, `name`, `created_at`, `last_used_at`; never tokens). `DELETE /api-keys/{id}` revokes → `{ "object": "api_key", "id": ..., "deleted": true }`.
 
 Rate limit: 600 requests/minute per key by default → 429 `rate_limit_exceeded` with a `retry-after` header (seconds).

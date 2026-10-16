@@ -25,11 +25,11 @@ curl -X POST "$MILLIONSEND_BASE_URL/broadcasts" \
 # → { "id": "<broadcast uuid>" }
 ```
 
-- `from` (single mailbox, display name ok) and `subject` required; at least one of `html`/`text`. Optional: `name`, `reply_to`, `preview_text` (inbox preview — injected as a hidden preheader at fan-out).
+- `from` (single mailbox, display name ok) and `subject` (≤ 998 chars) required; at least one of `html`/`text`. Optional: `name`, `reply_to`, `preview_text` (inbox preview — injected as a hidden preheader at fan-out).
 - **Targeting**: omit both `segment_id` and `topic_id` → every non-unsubscribed contact. `segment_id` → contacts the segment resolves to (saved filter matches ∪ manual members). `topic_id` → only contacts subscribed to that topic (default subscription + per-contact overrides). Both together intersect.
 - **Send on create**: `"send": true` sends immediately; add `"scheduled_at"` (requires `send: true`) to schedule instead — ISO 8601 with offset or a relative time (`"in 1 hour"`, `"in 2 days"`), max 30 days ahead.
 
-`PATCH /broadcasts/{id}` updates any of the content/targeting fields (draft only, else 400 `invalid_parameter` "Only draft broadcasts can be updated"). `DELETE /broadcasts/{id}` deletes a draft. `GET /broadcasts` lists (keyset pagination: `limit` 1–100 default 20, `after`/`before` id cursors); `GET /broadcasts/{id}` returns the full body (`from`, `subject`, `preview_text`, `topic_id`, `html`, `text`, ...) with wire `status` of `draft` | `queued` | `sent` | `canceled` (internal scheduled/sending both surface as `queued`).
+`PATCH /broadcasts/{id}` updates any of the content/targeting fields (draft only, else 400 `invalid_parameter` "Only draft broadcasts can be updated"). `DELETE /broadcasts/{id}` deletes a draft. `GET /broadcasts` lists (keyset pagination: `limit` 1–100 default 20, `after`/`before` id cursors); `GET /broadcasts/{id}` returns the full body (`from`, `subject`, `preview_text`, `topic_id`, `html`, `text`, ...) with wire `status` of `draft` | `queued` | `sent` | `canceled` (internal scheduled/sending both surface as `queued`). `GET /broadcasts` and `GET /templates` run newest first since v0.13.0: `after` takes a page's last id and pages toward older items; to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`.
 
 ## Merge fields (personalization)
 
@@ -62,7 +62,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/broadcasts/$ID/send" \
 Only drafts can be sent (400 `invalid_parameter` otherwise). Preconditions checked at send time (all return the standard `{ statusCode, name, message }` error body):
 
 - The instance must have `APP_BASE_URL` set — unsubscribe links are built from it (422 otherwise).
-- The `from` domain must be a verified team domain (422 `The <domain> domain is not verified for this team`). A domain-scoped key must match it (403 `restricted_api_key`).
+- The `from` domain must be a verified team domain (422 `The <domain> domain is not verified for this team`). A domain-scoped key must match it (403 `restricted_api_key`). An address on the team's shared inbox subdomain (the `shared: true` row of `GET /domains`, though it reads `verified`) is refused with 403 `inbox_send_policy`.
 - If the team's bounce/complaint rate is at the SES pause line: 403 `sending_paused` — lower it before new campaigns.
 - If the platform's aggregate rate in the sender's SES region is near the SES review line: 403 `broadcasts_paused` — per region, broadcasts only (transactional `/emails` unaffected), clears on its own; retry later.
 

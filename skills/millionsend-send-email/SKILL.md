@@ -10,6 +10,7 @@ Base URL: `https://api.millionsend.com` (cloud) or the instance's own API origin
 ## Prerequisites
 
 - The `from` address's domain must be a **verified domain** of the team (dashboard → Domains, or the `/domains` API — see the millionsend-domains skill). Otherwise: 422 `The <domain> domain is not verified for this team`.
+- A `GET /domains` row with `shared: true` (the team's shared inbox subdomain, v0.14.0+) reads `verified`, yet sends only from its inboxes' own addresses: `from` must be one inbox's address exactly (no `+tag`; a display name only if it is the inbox's `from_name`), without `scheduled_at`, `reply_to`, `attachments` or `headers` (422 `validation_error` otherwise), and only where that inbox may start conversations (403 `inbox_send_policy` otherwise). `POST /emails/batch`, broadcasts and the SMTP relay always refuse it (403 `inbox_send_policy`; SMTP `550 5.7.1`). Send everything else from a `shared: false` row.
 - A key with `sending_access` permission can only use `/emails*` routes. A domain-scoped key can only send from its assigned domain (403 `restricted_api_key` otherwise).
 
 ## Send one email — POST /emails
@@ -31,7 +32,7 @@ Request fields (Resend-shaped, snake_case):
 
 - `from` (required) — exactly one mailbox; display name allowed (`"Acme <x@acme.dev>"`).
 - `to` (required) — string or array, max 50 recipients. `cc`, `bcc`, `reply_to` same shape. A `to`/`cc`/`bcc` address on a domain that can never receive mail — a reserved name (`.test`, `.invalid`, `.local`, …), `example.com`/`.net`/`.org`, or a TLD that doesn't exist (`gmail.con`) — is a 422 `validation_error` naming it. To test without emailing anyone, send to `success@simulator.amazonses.com` (the SES mailbox simulator; the email shows as `delivered`).
-- `subject` (required); at least one of `html` / `text` (required).
+- `subject` (required, up to 998 characters; longer is a 422); at least one of `html` / `text` (required).
 - `scheduled_at` — ISO 8601 **with offset** (`2026-09-01T10:00:00-03:00`) or a relative time: `in N min(s)/minute(s)/hour(s)/day(s)` ("in 5 mins", "in 2 hours", "in 1 day"). Max 30 days ahead.
 - `tags` — `[{ "name": "...", "value": "..." }]`.
 - `topic_id` — a topic UUID: recipients opted out of that topic are dropped at accept (like suppression hits), an RFC 8058 `List-Unsubscribe` header is added, and the literal tokens `{{{UNSUBSCRIBE_URL}}}` / `{{{RESEND_UNSUBSCRIBE_URL}}}` in the body are replaced with a per-recipient unsubscribe link.
@@ -72,7 +73,7 @@ Body is a **bare JSON array** of send objects, 1–100 items. Items take the ful
 
 ## Get, reschedule, cancel
 
-- `GET /emails?limit=&after=|before=` — keyset pagination (`limit` 1–100 default 20, cursors are item ids, `after`/`before` mutually exclusive) → `{ object: "list", data: [...], has_more }`.
+- `GET /emails?limit=&after=|before=` — keyset pagination (`limit` 1–100 default 20, cursors are item ids, `after`/`before` mutually exclusive) → `{ object: "list", data: [...], has_more }`. Newest first since v0.13.0: `after` takes a page's last id and pages toward older emails; to sync, pass the newest id you stored as `before`, then each page's first id while `has_more` is `true`.
 - `GET /emails/{id}` → `{ object: "email", id, from, to, subject, html, text, last_event, scheduled_at, ... }`. `last_event` is the delivery status (`queued`, `sent`, `delivered`, `bounced`, `complained`, ...).
 - `PATCH /emails/{id}` with `{ "scheduled_at": "..." }` (ISO or relative) — reschedules a **not-yet-sent scheduled** email → `{ object: "email", id }`.
 - `POST /emails/{id}/cancel` — cancels a scheduled, not-yet-sent email only (immediate sends cannot be canceled). Returns `{ object: "email", id }`.
@@ -122,4 +123,4 @@ Every error body is `{ "statusCode": <int>, "name": "<code>", "message": "<human
 
 ## SMTP relay (for software that only speaks SMTP)
 
-Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events); a recipient on a domain that can never receive mail is refused at `RCPT TO` with `550 5.1.2`, and the other recipients are still accepted.
+Host: the instance host, port `2587`. Username: `millionsend` (fixed). Password: an `ms_` API key. STARTTLS is offered (and required before AUTH) when the server has a TLS keypair configured; without one the relay only runs if the operator explicitly allowed insecure auth for a private network. Same pipeline as `POST /emails` (domain verification, suppression, events); a recipient on a domain that can never receive mail is refused at `RCPT TO` with `550 5.1.2`, and the other recipients are still accepted. Each message spends one unit of the key's per-minute budget, the same one its API calls spend (default 600), and a team sends at most 3,000 a minute: past either, the relay answers `451 4.7.1` at `MAIL FROM` with the seconds left, before the message is sent, so the client keeps it and retries. A subject over 998 characters is a `554`.
