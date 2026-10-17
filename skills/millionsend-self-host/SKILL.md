@@ -18,7 +18,7 @@ mkdir millionsend && cd millionsend
 npx @millionsend/setup
 ```
 
-The wizard creates `.env` with generated secrets, optionally provisions the AWS resources (IAM policy + user + access key, SNS event topic, SES configuration set; adds an SQS queue when there is no public https URL), downloads the compose file, and runs `docker compose up -d`. Every step is skippable and safe to re-run; `--dry-run` prints the plan and touches nothing. Run it wherever AWS **admin** credentials live (laptop is fine) — the server itself never needs admin credentials; `teardown` deletes everything it created. No Node on the server? The same CLI ships inside the image: `docker run --rm -it --user root -v ~/.aws:/root/.aws ghcr.io/millionsend/millionsend:edge setup`.
+The wizard creates `.env` with generated secrets, optionally provisions the AWS resources (IAM policy + user + access key, SNS event topic, the SQS events queue the worker long-polls, SES configuration set), downloads the compose file, and runs `docker compose up -d`. Every step is skippable and safe to re-run; `--dry-run` prints the plan and touches nothing. Run it wherever AWS **admin** credentials live (laptop is fine) — the server itself never needs admin credentials; `teardown` deletes everything it created. No Node on the server? The same CLI ships inside the image: `docker run --rm -it --user root -v ~/.aws:/root/.aws ghcr.io/millionsend/millionsend:edge setup`.
 
 Dashboard: http://localhost:3000 · API: http://localhost:3001.
 
@@ -40,14 +40,11 @@ Required `.env` values (everything else defaults to a working local setup):
 - `APP_BASE_URL` — the exact URL the dashboard is opened at (default `http://localhost:3000`). It is the only origin sign-in accepts and is baked into unsubscribe/tracking links; a mismatch breaks login and blocks broadcast sends.
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — or rely on the default AWS credential chain. SES sandbox accounts must keep `SES_MAX_SEND_RATE=1`.
 
-## SES events (bounces, complaints, deliveries, opens, clicks)
+## SES events (bounces, complaints, deliveries)
 
-The setup wizard always configures this. Two transports:
+The setup wizard always configures this: an SQS queue (`millionsend-events`) the worker long-polls, its URL in `.env` as `SQS_QUEUE_URL`. A public https `APP_BASE_URL` also gets an SNS subscription pushing to `https://<your-host>/ses/events` (confirms itself once the app runs with `SNS_TOPIC_ARNS` set; if pending, use "Request confirmation" in the SNS console), and the app dedupes the two. Keep `SQS_QUEUE_URL` set even with an https `APP_BASE_URL`: clearing it leaves events piling up in the queue.
 
-- Public https `APP_BASE_URL` → SNS subscription pushing to `https://<your-host>/ses/events` (confirms itself once the app runs with `SNS_TOPIC_ARNS` set; if pending, use "Request confirmation" in the SNS console).
-- Otherwise → an SQS queue (`millionsend-events`) the worker long-polls; its URL goes in `.env` as `SQS_QUEUE_URL`.
-
-Manual equivalent: SNS standard topic (same region as SES) → its ARN in `SNS_TOPIC_ARNS` (an allowlist — events from other topics are rejected); an SES **configuration set** with an event destination to that topic (event types: Send, Delivery, Delivery Delay, Bounce, Complaint, Open, Click, Reject, Rendering Failure) → name in `SES_CONFIGURATION_SET`. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out but emit **no events** (no delivery tracking, no webhooks, no automatic suppression). The dashboard's Settings → SES page also offers a CloudFormation quick-create link.
+Manual equivalent: SNS standard topic (same region as SES) → its ARN in `SNS_TOPIC_ARNS` (an allowlist — events from other topics are rejected); an SES **configuration set** with an event destination to that topic (event types: Delivery, Delivery Delay, Bounce, Complaint, Reject, Rendering Failure; not Open or Click, which make SES rewrite every link and inject its own pixel, while MillionSend tracks opens and clicks itself) → name in `SES_CONFIGURATION_SET`. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out but emit **no SES events** (no delivery tracking, so no `email.delivered`, `email.delivery_delayed`, `email.bounced` or `email.complained` webhooks, no `email.failed` for a message SES rejects after `email.sent`, and no automatic suppression). The dashboard's Settings → SES page also offers a CloudFormation quick-create link.
 
 ## Domain verification (DNS)
 

@@ -35,7 +35,7 @@ Request fields (Resend-shaped, snake_case):
 - `subject` (required, up to 998 characters; longer is a 422); at least one of `html` / `text` (required).
 - `scheduled_at` — ISO 8601 **with offset** (`2026-09-01T10:00:00-03:00`) or a relative time: `in N min(s)/minute(s)/hour(s)/day(s)` ("in 5 mins", "in 2 hours", "in 1 day"). Max 30 days ahead.
 - `tags` — `[{ "name": "...", "value": "..." }]`.
-- `topic_id` — a topic UUID: recipients opted out of that topic are dropped at accept (like suppression hits), an RFC 8058 `List-Unsubscribe` header is added, and the literal tokens `{{{UNSUBSCRIBE_URL}}}` / `{{{RESEND_UNSUBSCRIBE_URL}}}` in the body are replaced with a per-recipient unsubscribe link.
+- `topic_id` — a topic UUID: recipients opted out of that topic are dropped like suppression hits, at accept and again when a scheduled or parked email goes out (see below); an RFC 8058 `List-Unsubscribe` header is added, and the literal tokens `{{{UNSUBSCRIBE_URL}}}` / `{{{RESEND_UNSUBSCRIBE_URL}}}` in the body are replaced with a per-recipient unsubscribe link.
 - `attachments` — `[{ "filename": "invoice.pdf", "content": "<base64>", "content_type": "application/pdf" }]`. Only inline base64 `content` is accepted: a `path` URL is a 422 (never fetched — SSRF), and `content_id` (inline images) is a 422.
 - `headers` — flat string map of extra message headers. Transport-owned names are rejected with 422 (case-insensitive): `From`, `To`, `Cc`, `Bcc`, `Reply-To`, `Subject`, `Content-Type`, `Return-Path`, `List-Unsubscribe`, anything `x-ses-*`, etc. Values must not contain control characters.
 
@@ -70,6 +70,14 @@ Body is a **bare JSON array** of send objects, 1–100 items. Items take the ful
 
 - **Strict (default)** — all-or-nothing: any invalid item (bad field, unverified domain, all recipients suppressed) fails the whole batch with `emails.<index>: <reason>` and nothing is sent. Response: `{ "data": [{ "id": "..." }, ...] }` in input order.
 - **Permissive** — send `x-batch-validation: permissive`: the valid subset is accepted and each failure is reported by input index: `{ "data": [...], "errors": [{ "index": 2, "message": "..." }] }` (`errors` is present, possibly empty, in permissive mode).
+
+## Suppressed and opted-out recipients
+
+- At accept, `to`/`cc`/`bcc` recipients on the team's suppression list are dropped (bounce, complaint and manual entries always; `unsubscribe` entries only on a send with a `topic_id`), and so are recipients opted out of the send's `topic_id`.
+- No `to` recipient left → 422 `all_recipients_suppressed`. When the suppression list alone emptied `to`, `POST /emails` still keeps a metadata-only email with status `suppressed` (no content, not counted toward the quota) and fires `email.suppressed`; each retry keeps another, even with the same `Idempotency-Key` (a refused send doesn't hold its key). Topic opt-outs, batch items and the SMTP relay keep nothing.
+- An email that waits before it goes out, such as a scheduled or parked one, is checked again when it does: recipients suppressed or opted out of its `topic_id` in the meantime are dropped, and if no `to` recipient is left it ends `suppressed` without being sent and fires `email.suppressed` (reason `recipient_suppressed` or `topic_unsubscribed`; see the millionsend-webhooks skill).
+- Dropping only some recipients, at accept or when the email goes out, fires nothing: the email goes to the rest.
+- The all-suppressed record, the send-time topic re-check and `email.suppressed` need MillionSend v0.15.1 or later.
 
 ## Get, reschedule, cancel
 
