@@ -47,7 +47,7 @@ The setup wizard always configures this. Two transports:
 - Public https `APP_BASE_URL` → SNS subscription pushing to `https://<your-host>/ses/events` (confirms itself once the app runs with `SNS_TOPIC_ARNS` set; if pending, use "Request confirmation" in the SNS console).
 - Otherwise → an SQS queue (`millionsend-events`) the worker long-polls; its URL goes in `.env` as `SQS_QUEUE_URL`.
 
-Manual equivalent: SNS standard topic (same region as SES) → its ARN in `SNS_TOPIC_ARNS` (an allowlist — events from other topics are rejected); an SES **configuration set** with an event destination to that topic (event types: Send, Delivery, Delivery Delay, Bounce, Complaint, Open, Click, Reject, Rendering Failure) → name in `SES_CONFIGURATION_SET`. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out but emit **no events** (no delivery tracking, no webhooks, no automatic suppression). The dashboard's Settings → SES page also offers a CloudFormation quick-create link.
+Manual equivalent: SNS standard topic (same region as SES) → its ARN in `SNS_TOPIC_ARNS` (an allowlist — events from other topics are rejected); an SES **configuration set** with an event destination to that topic (event types: Send, Delivery, Delivery Delay, Bounce, Complaint, Open, Click, Reject, Rendering Failure) → name in `SES_CONFIGURATION_SET`. Restart after setting them. Without `SES_CONFIGURATION_SET`, sends go out but emit **no events** (no delivery tracking, so no `email.delivered`, `email.delivery_delayed`, `email.bounced` or `email.complained` webhooks, and no automatic suppression). The dashboard's Settings → SES page also offers a CloudFormation quick-create link.
 
 ## Domain verification (DNS)
 
