@@ -74,7 +74,7 @@ Body is a **bare JSON array** of send objects, 1–100 items. Items take the ful
 ## Suppressed and opted-out recipients
 
 - At accept, `to`/`cc`/`bcc` recipients on the team's suppression list are dropped (bounce, complaint and manual entries always; `unsubscribe` entries only on a send with a `topic_id`), and so are recipients opted out of the send's `topic_id`.
-- No `to` recipient left → 422 `all_recipients_suppressed`. When the suppression list alone emptied `to`, `POST /emails` still keeps a metadata-only email with status `suppressed` (no content, not counted toward the quota) and fires `email.suppressed`; each retry keeps another. Topic opt-outs, batch items and the SMTP relay keep nothing.
+- No `to` recipient left → 422 `all_recipients_suppressed`. When the suppression list alone emptied `to`, `POST /emails` still keeps a metadata-only email with status `suppressed` (no content, not counted toward the quota) and fires `email.suppressed`; each retry keeps another, even with the same `Idempotency-Key` (a refused send doesn't hold its key). Topic opt-outs, batch items and the SMTP relay keep nothing.
 - An email that waits before it goes out, such as a scheduled or parked one, is checked again when it does: recipients suppressed or opted out of its `topic_id` in the meantime are dropped, and if no `to` recipient is left it ends `suppressed` without being sent and fires `email.suppressed` (reason `recipient_suppressed` or `topic_unsubscribed`; see the millionsend-webhooks skill).
 - Dropping only some recipients, at accept or when the email goes out, fires nothing: the email goes to the rest.
 
