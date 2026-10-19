@@ -16,6 +16,24 @@ One skill:
 npx skills add MillionSend/skills --skill millionsend-send-email
 ```
 
+## Plugin (Cursor and Grok Bot)
+
+This repo is also a [Cursor plugin](https://cursor.com/docs/plugins): `.cursor-plugin/plugin.json` is the manifest, `mcp.json` adds the hosted MCP server (`https://api.millionsend.com/mcp`), and the skills load from `skills/`.
+
+Cursor, from a local clone:
+
+```sh
+git clone https://github.com/MillionSend/skills ~/.cursor/plugins/local/millionsend
+```
+
+Then run **Developer: Reload Window** (or restart Cursor) and check **Customize** for the skills and the `millionsend` MCP server. On Teams and Enterprise, local plugins load only while the admin setting **Allow Local Plugin Imports** is on (off by default on Enterprise). Clone into that folder rather than symlinking it: Cursor skips symlinks that point outside `~/.cursor/plugins/local`.
+
+Grok Bot: in a chat, say "Add this MCP server: https://api.millionsend.com/mcp".
+
+Sign-in is OAuth through app.millionsend.com: on first connect you pick the team (or all teams) and the permissions the agent gets. There is no API key to paste and no local process to run. Revoke access under **Settings → Connected apps** in the MillionSend dashboard.
+
+Self-hosted: point `mcp.json` at your instance's own `/mcp` URL (shown under **Settings → MCP**).
+
 ## Skills
 
 | Skill | What it covers |

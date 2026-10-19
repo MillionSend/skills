@@ -1,0 +1,15 @@
+{
+  "name": "millionsend",
+  "displayName": "MillionSend",
+  "description": "MillionSend's hosted MCP server with OAuth sign-in and no API key, plus skills for sending email, contacts, broadcasts, domains, webhooks, the MCP tools, self-hosting and moving from Resend.",
+  "version": "1.0.0",
+  "logo": "assets/logo.png",
+  "author": {
+    "name": "MillionSend",
+    "email": "support@millionsend.com"
+  },
+  "homepage": "https://millionsend.com",
+  "repository": "https://github.com/MillionSend/skills",
+  "license": "MIT",
+  "keywords": ["email", "transactional-email", "email-marketing", "mcp", "millionsend"]
+}
