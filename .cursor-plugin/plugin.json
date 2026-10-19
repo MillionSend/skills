@@ -6,8 +6,7 @@
   "logo": "assets/logo.png",
   "author": {
     "name": "MillionSend",
-    "email": "support@millionsend.com",
-    "url": "https://millionsend.com"
+    "email": "support@millionsend.com"
   },
   "homepage": "https://millionsend.com",
   "repository": "https://github.com/MillionSend/skills",

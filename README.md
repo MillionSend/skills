@@ -26,7 +26,7 @@ Cursor, from a local clone:
 git clone https://github.com/MillionSend/skills ~/.cursor/plugins/local/millionsend
 ```
 
-Then run **Developer: Reload Window** (or restart Cursor) and check **Customize** for the skills and the `millionsend` MCP server. Clone into that folder rather than symlinking it: Cursor skips symlinks that point outside `~/.cursor/plugins/local`.
+Then run **Developer: Reload Window** (or restart Cursor) and check **Customize** for the skills and the `millionsend` MCP server. On Teams and Enterprise, local plugins load only while the admin setting **Allow Local Plugin Imports** is on (off by default on Enterprise). Clone into that folder rather than symlinking it: Cursor skips symlinks that point outside `~/.cursor/plugins/local`.
 
 Grok Bot: in a chat, say "Add this MCP server: https://api.millionsend.com/mcp".
 
