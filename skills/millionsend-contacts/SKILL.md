@@ -32,7 +32,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/contacts" \
 
 Read/update/delete — the `{id}` path segment accepts **either the contact UUID or its email** (case-insensitive):
 
-- `GET /contacts/{id}` → full contact; each entry of `properties` is a typed wrapper `{ "type": "string" | "number", "value": ... }` (the type comes from the team's property definitions, see below).
+- `GET /contacts/{id}` → full contact; each entry of `properties` is a typed wrapper `{ "type": "string" | "number" | "date", "value": ... }` (the type comes from the team's property definitions, see below; a `date` value is the stored text, e.g. `"2026-01-08"`).
 - `PATCH /contacts/{id}` — any of `first_name`/`last_name` (nullable to clear), `unsubscribed`, `properties` (merged; a `null` value removes the key).
 - `DELETE /contacts/{id}` → `{ "object": "contact", "contact": "<uuid>", "deleted": true }`. The contact's emails stay in the send log; `?erase=true` also scrubs the address from email history, event payloads and API logs (GDPR/LGPD).
 - `POST /contacts/batch/remove` with `{ "ids": [...] }` **or** `{ "emails": [...] }` (exactly one, 1–1000; emails case-insensitive) → `{ "data": [{ "object": "contact", "contact": "<uuid>", "deleted": true }, ...] }` listing only the rows actually deleted. MillionSend extension (Resend deletes one at a time). Deleting keeps the contacts' emails in the send log; add `"erase": true` to also scrub each address from email history, event payloads and API logs (GDPR/LGPD), the same as `DELETE /contacts/{id}?erase=true`. MCP: `delete_contacts` (with `erase`).
@@ -70,7 +70,7 @@ curl -X POST "$MILLIONSEND_BASE_URL/contacts/batch?on_conflict=upsert" \
 
 ## Contact properties — typed keys at /contact-properties
 
-Property **definitions** give each key a type (`string` | `number`) and an optional fallback used when a contact lacks the key (e.g. in broadcast merge fields):
+Property **definitions** give each key a type (`string` | `number` | `date`, the last a MillionSend extension since v0.22.0) and an optional fallback used when a contact lacks the key (e.g. in broadcast merge fields):
 
 ```sh
 curl -X POST "$MILLIONSEND_BASE_URL/contact-properties" \
@@ -80,7 +80,8 @@ curl -X POST "$MILLIONSEND_BASE_URL/contact-properties" \
 # → { "object": "contact_property", "id": "<uuid>" }
 ```
 
-- `key` ≤ 200 chars; `fallback_value` must match `type` (a `number` property rejects non-numeric fallbacks); string fallbacks ≤ 1000 chars.
+- `key` ≤ 200 chars; `fallback_value` must match `type` (a `number` property rejects non-numeric fallbacks, a `date` one anything that isn't a date); string fallbacks ≤ 1000 chars.
+- A `date` property takes `YYYY-MM-DD` (midnight UTC), a date-time with `T` or a space and an optional zone (UTC when none, e.g. `2026-01-08T10:30:00Z`), or Unix seconds or milliseconds between the years 2000 and 2100. Contact writes (`POST`/`PATCH /contacts`, batch) refuse any other value for that key with 422 `validation_error`; keys match in any letter case. Dates can still live in a `string` property: segments and the domain warm-up read dates from any property.
 - `GET /contact-properties` (paginated list) · `GET /contact-properties/{id}` · `PATCH /contact-properties/{id}` (**only** `fallback_value` is updatable — key and type are fixed) · `DELETE /contact-properties/{id}` → `{ ..., "deleted": true }`.
 
 ## Segments — saved filters or manual lists at /segments
@@ -108,7 +109,7 @@ Filter grammar (validated server-side, unknown field/op → 422):
 - `match`: `"all"` (AND) or `"any"` (OR).
 - Text fields `email`, `first_name`, `last_name`, and `property:<key>` take ops `equals`, `not_equals`, `contains`, `starts_with`, `ends_with`, `is_set`, `is_not_set`. Presence ops (`is_set`/`is_not_set`) take `"value": null`; the rest need a string value.
 - `unsubscribed` takes `is_true` / `is_false` (value null).
-- `created_at` takes `before` / `after` with an ISO date string value.
+- Date ops, on `created_at` and on any `property:<key>` (since v0.22.0): `before` / `after` with an ISO date or date-time string, and `in_last_days` / `not_in_last_days` with a whole number of days as a string (`"1"` to `"36500"`). A property value that isn't a date matches none of them, a future date matches neither day op, and `is_not_set` finds contacts without the property.
 
 Routes: `POST /segments`, `GET /segments` (paginated like contacts), `GET /segments/{id}` (includes live `contact_count`), `PATCH /segments/{id}` (name and/or filter; `"filter": null` clears it, turning the segment manual-only), `DELETE /segments/{id}` (409 `conflict` if a broadcast references it).
 
