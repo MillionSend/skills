@@ -123,7 +123,7 @@ Membership (manual members; the contact path accepts UUID or email):
 Topics model opt-in/opt-out categories (e.g. "Product news"). `default_subscription` is fixed at creation: `opt_in` = subscribed unless the contact opts out; `opt_out` = unsubscribed unless they opt in.
 
 - `POST /topics` `{ "name": "Product news", "description": "...", "default_subscription": "opt_in", "visibility": "public" }` → `{ id }`. `visibility` (`private` | `public`, MillionSend extension): public topics always show on the hosted unsubscribe/preferences page; private topics show there only when reached through their own topic link.
-- `GET /topics` → `{ "data": [...] }` (no pagination); `GET /topics/{id}`; `PATCH /topics/{id}` (name, description, visibility — `default_subscription` is immutable and silently ignored if sent); `DELETE /topics/{id}` (409 `conflict` if a broadcast references it).
+- `GET /topics` → `{ "data": [...] }` (no pagination); `GET /topics/{id}`; `PATCH /topics/{id}` (name, description, visibility — `default_subscription` is immutable and silently ignored if sent); `DELETE /topics/{id}` (409 `conflict` if a broadcast references it, which a sent or canceled broadcast does for good, or while an email sent with the topic still waits to go out: retry once it's sent, or cancel a scheduled one with `POST /emails/{id}/cancel`).
 - Set a contact's subscriptions — `PATCH /contacts/{id}/topics` with a **bare array** body:
 
 ```sh
