@@ -19,6 +19,8 @@ curl -X POST "$MILLIONSEND_BASE_URL/domains" \
 - `name` — **lowercase** registrable hostname (uppercase is a 422, not normalized: SES registers the identity exactly as typed). Already added → 409 with name `conflict`.
 - `region` — optional. Each instance serves one SES region (MillionSend Cloud: `sa-east-1`) and uses it when the field is omitted; any other value is a 422 naming the served region. Don't copy a region from another provider.
 - `custom_return_path` — the MAIL FROM subdomain (Resend's name for it), default `"send"`.
+- Cloud limits: a team adds up to 10 domains an hour (100 on Scale), counted per UTC clock hour. Past that → 429 `rate_limit_exceeded` with `retry-after` (seconds to the next full hour): wait it out instead of retrying in a loop. Re-sending a name already added is a free 409. Plan caps are separate: Free 3, Starter 10, Pro and Scale unlimited → 403 `plan_limit_reached`.
+- On MillionSend Cloud, a domain not verified within 72 hours of being added is deleted, so add each one when its DNS records are about to be published.
 
 Response: the domain object (`id`, `name`, `status`, `region`, `open_tracking`, `click_tracking`, `tracking_subdomain`, `capabilities`) plus `records[]` — the DNS rows to create at the DNS provider, in the Resend SDK shape `{ record, name, type, ttl, status, value, priority? }`: DKIM CNAMEs, the MAIL FROM MX/TXT pair, and a recommended DMARC TXT row (a MillionSend superset — Resend doesn't include it).
 
